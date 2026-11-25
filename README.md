@@ -93,6 +93,47 @@ entered. Differences from Android:
 - If the screen locks, the app stops updating until it is unlocked again. When
   the browser cannot keep the screen awake, set Auto-Lock to a longer time.
 
+## Native iOS app
+
+The same app can be built as a real iPhone / iPad app, with no Bluefy needed.
+It is the web app wrapped with [Capacitor](https://capacitorjs.com); inside the
+wrapper, `js/native.js` swaps the browser's Bluetooth for the phone's own
+(through `js/native-bluetooth.js` and the Capacitor Bluetooth plugin) and keeps
+the screen on while a treadmill is linked. The Xcode project is in `ios/`.
+
+Building needs a Mac with Xcode (free, from the App Store), Node 22 or later
+and an Apple ID:
+
+```
+git clone https://github.com/Robelugo/run-gordo-run.git
+cd run-gordo-run
+npm install
+npm run ios:sync     # copies the app into the Xcode project
+npm run ios:open     # opens it in Xcode
+```
+
+Then, in Xcode:
+
+1. Xcode > Settings > Accounts: add your Apple ID.
+2. Click "App" in the left column, then the "App" target > Signing &
+   Capabilities. Tick "Automatically manage signing" and pick your team. If
+   Xcode says the bundle identifier is taken, change it there and in
+   `capacitor.config.json` (`appId`).
+3. Connect the iPad or iPhone by cable and unlock it. On the device, turn on
+   Settings > Privacy & Security > Developer Mode (it restarts once).
+4. Choose the device at the top of the Xcode window and press Run.
+5. With a free Apple ID the first launch is blocked until you trust yourself on
+   the device: Settings > General > VPN & Device Management.
+
+A free Apple ID's install stops opening after 7 days (press Run again to renew
+it); with the paid Apple Developer Program it lasts a year and can also be
+shared through TestFlight. After changing the app, run `git pull`,
+`npm install` and `npm run ios:sync`, then Run again.
+
+`npm run ios:add` recreates `ios/` from scratch (delete the folder first); it
+also applies `scripts/ios-setup.mjs`, which adds the Bluetooth and photo
+permissions texts and the icon from `native/icon-1024.png`.
+
 ## Unlock codes
 
 iFit equipment only accepts control commands after receiving a model-specific
@@ -114,6 +155,7 @@ speed: stop it with its own buttons or the safety key.
 - `js/protocol.js` - framing, checksums, value encoding (no Bluetooth)
 - `js/treadmill.js` - client: discovery, unlock, read/write, polling
 - `js/bluetooth.js` - Web Bluetooth transport
+- `js/native.js`, `js/native-bluetooth.js` - Bluetooth and screen-on inside the native iOS app
 - `js/simulator.js` - fake treadmill speaking the same bytes (demo mode, tests)
 - `js/codes.js` - known unlock codes
 - `js/programs.js` - workout programs (presets, custom intervals, step runner)

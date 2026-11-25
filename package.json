@@ -7,6 +7,20 @@
   "scripts": {
     "start": "node server.mjs",
     "phone": "node phone.mjs",
-    "test": "node --test test/"
+    "test": "node --test test/",
+    "ios:www": "node scripts/build-www.mjs",
+    "ios:add": "node scripts/build-www.mjs && cap add ios --packagemanager SPM && node scripts/ios-setup.mjs",
+    "ios:sync": "node scripts/build-www.mjs && cap sync ios",
+    "ios:open": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor-community/bluetooth-le": "^8.4.0",
+    "@capacitor-community/keep-awake": "^8.0.1",
+    "@capacitor/core": "^8.6.3",
+    "@capacitor/ios": "^8.6.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.3",
+    "esbuild": "^0.28.2"
   }
 }

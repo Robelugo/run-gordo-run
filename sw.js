@@ -1,10 +1,11 @@
 // Offline support: try the network first, fall back to the last copy we saw.
-const CACHE = 'run-gordo-run-v11';
+const CACHE = 'run-gordo-run-v12';
 const SHELL = [
   './',
   'index.html',
   'css/app.css',
   'js/app.js',
+  'js/native.js',
   'js/treadmill.js',
   'js/protocol.js',
   'js/bluetooth.js',

@@ -1,0 +1,9 @@
+{
+  "appId": "mx.rungordorun.app",
+  "appName": "Run-Gordo-Run",
+  "webDir": "www",
+  "backgroundColor": "#050c0e",
+  "ios": {
+    "contentInset": "never"
+  }
+}

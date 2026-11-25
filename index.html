@@ -248,6 +248,18 @@
     </div>
   </dialog>
 
+  <!-- Device list, used only inside the native iOS app (browsers show their own) -->
+  <dialog id="devicePicker">
+    <div class="sheet">
+      <div class="sheet-head">
+        <div class="headline small" id="pickerTitle">Devices</div>
+        <button class="pill small" data-close>Cancel</button>
+      </div>
+      <p class="hint" id="pickerHint"></p>
+      <div class="cards" id="pickerList"></div>
+    </div>
+  </dialog>
+
   <!-- Settings -->
   <dialog id="settings">
     <div class="sheet">

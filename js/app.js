@@ -1,3 +1,4 @@
+import { isNativeApp, nativeError, nativeScreen } from './native.js'; // first: sets up Bluetooth inside the native iOS app
 import { IfitClient, Mode } from './treadmill.js';
 import { MODE_LABELS } from './protocol.js';
 import { BluetoothTransport, bluetoothAvailable, isAppleMobile } from './bluetooth.js';
@@ -942,6 +943,10 @@ function applyCatStyle() {
 // ---------- connection ----------
 
 async function keepAwake() {
+  if (isNativeApp) {
+    if (client?.connected) nativeScreen.on();
+    return;
+  }
   try {
     if (!wakeLock && 'wakeLock' in navigator && client?.connected) {
       wakeLock = await navigator.wakeLock.request('screen');
@@ -987,6 +992,7 @@ async function connect() {
       if (client !== attempt) return;
       cancelPending();
       wakeLock?.release();
+      nativeScreen.off();
       setState('disconnected', 'Link lost');
       banner('Connection lost. The treadmill keeps doing what it was doing: use its own buttons or pull the safety key to stop.', true);
       feedback(220, [80, 60, 80]);
@@ -1037,6 +1043,7 @@ async function disconnect() {
   cancelPending();
   endProgram();
   wakeLock?.release();
+  nativeScreen.off();
   try {
     await old?.disconnect();
   } catch {
@@ -1315,4 +1322,5 @@ applyCatStyle();
 if (!isCompleteProfile(profile) && !store.get('profileAsked', false)) setTimeout(openProfile, 700);
 
 // On iPhone and iPad say straight away why Link cannot work in this browser.
-if (isAppleMobile() && !bluetoothAvailable() && !settings.demo) banner(NO_BLUETOOTH());
+if (nativeError) banner(`Bluetooth could not be started in this app: ${nativeError.message}`, true);
+else if (isAppleMobile() && !bluetoothAvailable() && !settings.demo) banner(NO_BLUETOOTH());
