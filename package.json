@@ -1,0 +1,12 @@
+{
+  "name": "carbon-tlx",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Phone/tablet web app for the ProForm Carbon TLX treadmill (iFit BLE protocol)",
+  "scripts": {
+    "start": "node server.mjs",
+    "phone": "node phone.mjs",
+    "test": "node --test test/"
+  }
+}

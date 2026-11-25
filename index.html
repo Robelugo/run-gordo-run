@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#050c0e">
+  <title>Carbon TLX</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Carbon TLX">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="orbit" id="orbit" data-state="disconnected"><i></i></span>
+      <span class="brand-name">Carbon TLX</span>
+    </div>
+    <div class="status" id="status" data-state="disconnected">
+      <span class="dot"></span>
+      <span id="statusText">Offline</span>
+    </div>
+    <button class="pill" id="connectBtn">Link</button>
+    <button class="icon-btn" id="programsBtn" aria-label="Programs and history">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h4V9h4v9h4V5h4v13h2"/></svg>
+    </button>
+    <button class="icon-btn" id="settingsBtn" aria-label="Settings">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+    </button>
+  </header>
+
+  <div class="banner" id="banner" hidden></div>
+
+  <main class="layout">
+    <section class="panel stage" id="stage" style="--i:0">
+      <canvas id="catCanvas"></canvas>
+      <div class="scan" aria-hidden="true"></div>
+      <div class="stage-hud">
+        <span class="tag" id="modeTag">Standby</span>
+        <span class="tag" id="paceTag"></span>
+      </div>
+      <span class="tag cat-tag" id="catTag"></span>
+      <div class="countdown" id="countdown" hidden></div>
+      <div class="program-bar" id="programBar" hidden>
+        <div class="program-line">
+          <b id="progStep">Warm-up</b>
+          <span id="progRemain">0:00</span>
+        </div>
+        <div class="program-next">
+          <span id="progNext"></span>
+          <button class="pill small abort" id="progEndBtn">End program</button>
+        </div>
+        <div class="segments" id="progSegments"></div>
+      </div>
+    </section>
+
+    <section class="panel gauge" id="speedPanel" style="--i:1">
+      <div class="ring-wrap">
+        <svg viewBox="0 0 120 120" class="ring" aria-hidden="true">
+          <circle class="ring-ticks" cx="60" cy="60" r="57" pathLength="120"/>
+          <circle class="ring-track" cx="60" cy="60" r="49" pathLength="100"/>
+          <circle class="ring-value" id="speedArc" cx="60" cy="60" r="49" pathLength="100"/>
+          <g class="ring-marker" id="speedMarker"><circle cx="60" cy="11" r="3"/></g>
+        </svg>
+        <div class="readout">
+          <span class="label">Speed</span>
+          <span class="big" id="speedNow">0.0</span>
+          <span class="unit" id="uSpeed">km/h</span>
+          <span class="target">Set <b id="speedTarget">0.0</b></span>
+        </div>
+      </div>
+      <div class="stepper">
+        <button class="step" data-speed="-1" aria-label="Slower">&minus;</button>
+        <button class="step" data-speed="1" aria-label="Faster">+</button>
+      </div>
+      <div class="presets" id="speedPresets"></div>
+    </section>
+
+    <section class="panel gauge incline" id="inclinePanel" style="--i:2">
+      <div class="ring-wrap">
+        <svg viewBox="0 0 120 120" class="ring" aria-hidden="true">
+          <circle class="ring-ticks" cx="60" cy="60" r="57" pathLength="120"/>
+          <circle class="ring-track" cx="60" cy="60" r="49" pathLength="100"/>
+          <circle class="ring-value" id="inclineArc" cx="60" cy="60" r="49" pathLength="100"/>
+          <g class="ring-marker" id="inclineMarker"><circle cx="60" cy="11" r="3"/></g>
+        </svg>
+        <div class="readout">
+          <span class="label">Incline</span>
+          <span class="big" id="inclineNow">0.0</span>
+          <span class="unit">%</span>
+          <span class="target">Set <b id="inclineTarget">0.0</b></span>
+        </div>
+      </div>
+      <div class="stepper">
+        <button class="step" data-incline="-1" aria-label="Lower">&minus;</button>
+        <button class="step" data-incline="1" aria-label="Higher">+</button>
+      </div>
+      <div class="presets" id="inclinePresets"></div>
+    </section>
+
+    <section class="panel stats" style="--i:3">
+      <div class="metric"><span class="value" id="mTime">0:00</span><span class="label">Time</span></div>
+      <div class="metric"><span class="value"><span id="mDistance">0.00</span></span><span class="label" id="uDistance">Km</span></div>
+      <div class="metric"><span class="value" id="mCalories">0</span><span class="label">Kcal</span></div>
+      <div class="metric link" id="pulseCell" role="button" data-state="off"><span class="value" id="mPulse">--</span><span class="label" id="uPulse">Bpm · link</span></div>
+      <div class="metric"><span class="value" id="mPace">--</span><span class="label" id="uPace">Pace /km</span></div>
+      <div class="metric"><span class="value" id="mAvg">0.0</span><span class="label" id="uAvg">Avg km/h</span></div>
+      <div class="metric"><span class="value" id="mMax">0.0</span><span class="label" id="uMax">Max km/h</span></div>
+      <div class="metric"><span class="value" id="mElev">0</span><span class="label">Climb m</span></div>
+    </section>
+
+    <section class="panel chart" style="--i:4">
+      <div class="panel-title">
+        <span>Session</span>
+        <span class="legend"><i class="k speed"></i>Speed <i class="k incline"></i>Incline <i class="k heart"></i>Bpm</span>
+      </div>
+      <canvas id="chart"></canvas>
+    </section>
+  </main>
+
+  <footer class="actions">
+    <button class="act go" id="startBtn"><span>Start</span></button>
+    <button class="act stop" id="stopBtn"><span>Stop</span></button>
+  </footer>
+
+  <!-- Programs and history -->
+  <dialog id="programs">
+    <div class="sheet">
+      <div class="sheet-head">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="programList" role="tab">Programs</button>
+          <button class="tab" data-tab="historyList" role="tab">History</button>
+        </div>
+        <button class="pill small" data-close>Close</button>
+      </div>
+
+      <div class="tab-body" id="programList">
+        <div class="levels">
+          <label><span class="label">Walk</span><input type="number" id="lvlWalk" inputmode="decimal" step="0.1" min="1"></label>
+          <label><span class="label">Jog</span><input type="number" id="lvlJog" inputmode="decimal" step="0.1" min="1"></label>
+          <label><span class="label">Run</span><input type="number" id="lvlRun" inputmode="decimal" step="0.1" min="1"></label>
+          <span class="label" id="lvlUnit">km/h</span>
+        </div>
+        <div class="cards" id="presetCards"></div>
+        <details class="builder" id="builder">
+          <summary>Custom intervals</summary>
+          <div class="builder-grid">
+            <label><span class="label">Warm-up min</span><input type="number" id="cWarm" inputmode="numeric" min="0" max="30"></label>
+            <label><span class="label">Work sec</span><input type="number" id="cWork" inputmode="numeric" min="5" max="1800"></label>
+            <label><span class="label">Rest sec</span><input type="number" id="cRest" inputmode="numeric" min="0" max="1800"></label>
+            <label><span class="label">Repeats</span><input type="number" id="cReps" inputmode="numeric" min="1" max="40"></label>
+            <label><span class="label">Cool-down min</span><input type="number" id="cCool" inputmode="numeric" min="0" max="30"></label>
+            <label><span class="label">Work incline %</span><input type="number" id="cIncline" inputmode="decimal" min="0" max="15" step="0.5"></label>
+          </div>
+          <button class="pill" id="useCustomBtn">Select custom</button>
+        </details>
+        <div class="section-head">
+          <b>Heart-rate hold</b>
+          <p class="hint" id="heartProgHint"></p>
+        </div>
+        <div class="cards" id="heartCards"></div>
+        <details class="builder" id="heartBuilder">
+          <summary>Custom heart rate</summary>
+          <div class="builder-grid">
+            <label><span class="label">Target bpm</span><input type="number" id="hTarget" inputmode="numeric" min="80" max="190"></label>
+            <label><span class="label">Hold min</span><input type="number" id="hMinutes" inputmode="numeric" min="3" max="120"></label>
+            <label><span class="label">Change</span>
+              <select id="hControl"><option value="speed">Speed</option><option value="incline">Incline</option></select>
+            </label>
+          </div>
+          <button class="pill" id="useHeartBtn">Select custom</button>
+        </details>
+        <div class="sheet-foot">
+          <span class="hint" id="programHint">Pick a program.</span>
+          <button class="pill confirm" id="startProgramBtn" disabled>Start program</button>
+        </div>
+      </div>
+
+      <div class="tab-body" id="historyList" hidden>
+        <div class="history" id="historyRows"></div>
+        <div class="sheet-foot">
+          <span class="hint" id="historyHint"></span>
+          <button class="pill abort small" id="clearHistoryBtn">Clear history</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Workout summary -->
+  <dialog id="summary">
+    <div class="sheet">
+      <div class="sheet-head">
+        <div class="headline small" id="summaryTitle">Workout complete</div>
+        <button class="pill small" data-close>Close</button>
+      </div>
+      <p class="hint" id="reportHint" hidden></p>
+      <div class="report-pages" id="reportPages"></div>
+      <div class="sheet-foot">
+        <button class="pill" id="shareReportBtn">Share</button>
+        <button class="pill" id="downloadReportBtn">Download</button>
+        <button class="pill confirm" data-close>Done</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Profile -->
+  <dialog id="profile">
+    <div class="sheet">
+      <div class="sheet-head">
+        <div class="headline small">Your profile</div>
+        <button class="pill small" data-close>Close</button>
+      </div>
+      <p class="hint">Used for heart-rate zones, VO2 max and calories. It stays on this device.</p>
+      <div class="form-grid">
+        <label><span class="label">Sex</span>
+          <select id="pSex"><option value="" disabled>Choose</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select>
+        </label>
+        <label><span class="label">Age</span><input type="number" id="pAge" inputmode="numeric" min="10" max="100"></label>
+        <label><span class="label" id="uWeight">Weight kg</span><input type="number" id="pWeight" inputmode="decimal" step="0.1"></label>
+        <label><span class="label" id="uHeight">Height cm</span><input type="number" id="pHeight" inputmode="decimal" step="0.1"></label>
+      </div>
+      <details>
+        <summary>Optional, for better estimates</summary>
+        <div class="form-grid">
+          <label><span class="label">Resting bpm</span><input type="number" id="pRest" inputmode="numeric" min="30" max="120" placeholder="65"></label>
+          <label><span class="label">Max bpm</span><input type="number" id="pMax" inputmode="numeric" min="100" max="230" placeholder="auto"></label>
+          <label class="wide"><span class="label">Usual activity</span>
+            <select id="pActivity">
+              <option value="1">Mostly sitting</option>
+              <option value="3">Light activity</option>
+              <option value="5">Regular exercise</option>
+              <option value="6">Run 15-30 km a week</option>
+              <option value="7">Run over 30 km a week</option>
+            </select>
+          </label>
+        </div>
+      </details>
+      <p class="hint error" id="profileError" hidden></p>
+      <div class="facts-list" id="profileFacts"></div>
+      <div class="sheet-foot">
+        <span class="hint">Estimates, not medical advice.</span>
+        <button class="pill confirm" id="saveProfileBtn">Save</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Settings -->
+  <dialog id="settings">
+    <div class="sheet">
+      <div class="sheet-head">
+        <div class="headline small">Settings</div>
+        <button class="pill small" data-close>Close</button>
+      </div>
+
+      <div class="row"><span>Profile <small id="profileStatus">Not set</small></span><button type="button" class="pill small" id="profileBtn">Edit</button></div>
+      <label class="row"><span>Units</span>
+        <select id="unitsSel"><option value="metric">Kilometres</option><option value="imperial">Miles</option></select>
+      </label>
+      <label class="row"><span>Cat</span>
+        <select id="catSel"></select>
+      </label>
+      <div class="row"><span>Cat camera <small>drag the cat to turn the view</small></span><button type="button" class="pill small" id="resetViewBtn">Reset</button></div>
+      <label class="row"><span>Hologram cat</span><input type="checkbox" class="switch" id="holoChk"></label>
+      <div class="row"><span>Heart rate strap <small id="heartStatus">Not linked</small></span><button type="button" class="pill small" id="heartBtn">Link</button></div>
+      <label class="row"><span>Sounds and vibration</span><input type="checkbox" class="switch" id="soundChk"></label>
+      <label class="row"><span>Demo mode <small>simulated treadmill, no Bluetooth</small></span><input type="checkbox" class="switch" id="demoChk"></label>
+      <label class="row"><span>List every Bluetooth device <small>if the treadmill does not show up</small></span><input type="checkbox" class="switch" id="showAllChk"></label>
+
+      <details>
+        <summary>Unlock code</summary>
+        <p class="hint" id="codeStatus">Not connected.</p>
+        <label class="row"><span>Use code</span><select id="codeSel"></select></label>
+        <label class="row stack"><span>Custom code <small>72 hex characters</small></span>
+          <input type="text" id="customCode" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="07…020000">
+        </label>
+        <div class="row">
+          <button type="button" class="pill small" id="applyCodeBtn">Try this code</button>
+          <button type="button" class="pill small abort" id="forgetCodeBtn">Forget saved code</button>
+        </div>
+      </details>
+
+      <details>
+        <summary>Treadmill</summary>
+        <dl class="facts" id="facts"></dl>
+      </details>
+
+      <details>
+        <summary>Log</summary>
+        <label class="row"><span>Record raw Bluetooth traffic</span><input type="checkbox" class="switch" id="trafficChk"></label>
+        <pre class="log" id="log"></pre>
+        <div class="row"><button type="button" class="pill small" id="copyLogBtn">Copy log</button></div>
+      </details>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
