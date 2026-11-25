@@ -10,6 +10,10 @@ zwifit,
 [QZ](https://github.com/cagnulein/qdomyos-zwift) and
 [ianchi/ifit](https://github.com/ianchi/ifit) projects.
 
+**Live app:** https://robelugo.github.io/carbon-tlx/ (add `?demo` to try it
+without a treadmill). It is served by GitHub Pages from the `main` branch, so
+`git push` publishes a new version within a minute or so.
+
 ## Run it
 
 ```
