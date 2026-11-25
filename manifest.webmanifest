@@ -1,7 +1,7 @@
 {
-  "name": "Carbon TLX",
-  "short_name": "Carbon TLX",
-  "description": "Remote control and dashboard for the ProForm Carbon TLX treadmill",
+  "name": "Run-Gordo-Run",
+  "short_name": "Run-Gordo-Run",
+  "description": "Unofficial remote control and workout dashboard for a ProForm Carbon TLX treadmill",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

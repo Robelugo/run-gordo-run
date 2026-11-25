@@ -1,5 +1,5 @@
 // Offline support: try the network first, fall back to the last copy we saw.
-const CACHE = 'carbon-tlx-v10';
+const CACHE = 'run-gordo-run-v11';
 const SHELL = [
   './',
   'index.html',

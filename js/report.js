@@ -97,7 +97,7 @@ function page(titleText, summary) {
   ctx.beginPath();
   ctx.arc(M + 26, 96, 11, 0, Math.PI * 2);
   ctx.fill();
-  text(ctx, 'CARBON TLX', M + 72, 106, { size: 27, color: C.accent, weight: 500, spacing: 9 });
+  text(ctx, 'RUN-GORDO-RUN', M + 72, 106, { size: 27, color: C.accent, weight: 500, spacing: 9 });
   const date = new Date(summary.date);
   label(ctx, date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }), W - M, 92, { align: 'right' });
   label(ctx, date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), W - M, 122, { align: 'right', color: C.text });
@@ -264,7 +264,7 @@ export function reportFiles(pages, date) {
     pages.map(
       (canvas, i) =>
         new Promise((resolve, reject) =>
-          canvas.toBlob((blob) => (blob ? resolve(new File([blob], `carbon-tlx-${stamp}-${i + 1}.png`, { type: 'image/png' })) : reject(new Error('could not create image'))), 'image/png'),
+          canvas.toBlob((blob) => (blob ? resolve(new File([blob], `run-gordo-run-${stamp}-${i + 1}.png`, { type: 'image/png' })) : reject(new Error('could not create image'))), 'image/png'),
         ),
     ),
   );

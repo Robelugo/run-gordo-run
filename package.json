@@ -1,9 +1,9 @@
 {
-  "name": "carbon-tlx",
+  "name": "run-gordo-run",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Phone/tablet web app for the ProForm Carbon TLX treadmill (iFit BLE protocol)",
+  "description": "Run-Gordo-Run: unofficial phone/tablet web app for a ProForm Carbon TLX treadmill (iFit BLE protocol)",
   "scripts": {
     "start": "node server.mjs",
     "phone": "node phone.mjs",

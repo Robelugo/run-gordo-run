@@ -1,8 +1,16 @@
-# Carbon TLX remote
+# Run-Gordo-Run
 
 A web app for phone or tablet that talks to a ProForm Carbon TLX treadmill over
 Bluetooth: live speed, incline, time, distance, calories and pulse, plus
-start / pause / stop and speed / incline control.
+start / pause / stop and speed / incline control, workout programs, heart-rate
+zones and a shareable report after each workout.
+
+> **Unofficial.** This is an independent hobby project. It is not affiliated
+> with, endorsed by or supported by iFIT or ProForm. "ProForm", "Carbon TLX" and
+> "iFit" are trademarks of their owners and are used here only to say which
+> equipment the app works with. It gives no access to iFit content or
+> subscriptions and changes nothing on the treadmill; it sends the same control
+> commands the official app sends. Use it at your own risk.
 
 The treadmill speaks iFit's proprietary Bluetooth protocol. This app implements
 it from the public reverse-engineering work of the
