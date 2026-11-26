@@ -15,6 +15,7 @@ import {
 } from './fitness.js';
 import { renderReport, reportFiles } from './report.js';
 import { HeartRunner, buildHeartProgram, heartPresets, targetLimits } from './hrcontrol.js';
+import { People } from './people.js';
 
 const $ = (id) => document.getElementById(id);
 const KM_PER_MILE = 1.609344;
@@ -23,10 +24,32 @@ const HOLD_MS = 1800; // keep showing the requested target until the treadmill r
 
 // ---------- settings ----------
 
+/** Stand-in when the browser refuses localStorage altogether. */
+const noStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+const storage = (() => {
+  try {
+    return globalThis.localStorage ?? noStorage;
+  } catch {
+    return noStorage;
+  }
+})();
+
+// Who is using the app: profile, history, program settings and cat are kept per person.
+const people = new People(storage);
+
 const store = {
   get(key, fallback) {
     try {
-      const raw = localStorage.getItem(`ctlx.${key}`);
+      const raw = storage.getItem(people.keyFor(key));
+      return raw === null ? fallback : JSON.parse(raw);
+    } catch {
+      return fallback;
+    }
+  },
+  /** One of another person's settings, for the list of people. */
+  peek(id, key, fallback) {
+    try {
+      const raw = storage.getItem(people.keyOf(id, key));
       return raw === null ? fallback : JSON.parse(raw);
     } catch {
       return fallback;
@@ -34,24 +57,43 @@ const store = {
   },
   set(key, value) {
     try {
-      if (value === null) localStorage.removeItem(`ctlx.${key}`);
-      else localStorage.setItem(`ctlx.${key}`, JSON.stringify(value));
+      if (value === null) storage.removeItem(people.keyFor(key));
+      else storage.setItem(people.keyFor(key), JSON.stringify(value));
     } catch {
       /* storage unavailable: settings just won't persist */
     }
   },
 };
 
+/** The selected person's own settings. A new person starts with the next cat along, to tell them apart. */
+function personalSettings() {
+  const breeds = Object.keys(BREEDS);
+  const firstCat = breeds[Math.max(0, people.list.indexOf(people.active)) % breeds.length];
+  let cat = store.get('cat', firstCat); // a key of BREEDS, or 'off'
+  let catHolo = store.get('catHolo', false);
+  if (cat === 'holo') {
+    // Older versions stored the hologram look as a cat choice.
+    cat = 'tabby';
+    catHolo = true;
+    store.set('cat', cat);
+    store.set('catHolo', true);
+  }
+  if (cat !== 'off' && !(cat in BREEDS)) cat = firstCat;
+  return {
+    cat,
+    catHolo,
+    levels: { ...DEFAULT_LEVELS, ...store.get('levels', {}) },
+    custom: { warmupMin: 5, workSec: 60, restSec: 60, repeats: 6, cooldownMin: 3, workIncline: 0, ...store.get('custom', {}) },
+    heartCustom: { target: null, minutes: 20, control: 'speed', ...store.get('heartCustom', {}) }, // target null = middle of the fat-burn zone
+  };
+}
+
 const settings = {
   units: store.get('units', null), // null = follow the treadmill until the user picks
   demo: store.get('demo', false) || new URLSearchParams(location.search).has('demo'),
   showAll: store.get('showAll', false),
   sound: store.get('sound', true),
-  cat: store.get('cat', 'tabby'), // a key of BREEDS, or 'off'
-  catHolo: store.get('catHolo', false),
-  levels: { ...DEFAULT_LEVELS, ...store.get('levels', {}) },
-  custom: { warmupMin: 5, workSec: 60, restSec: 60, repeats: 6, cooldownMin: 3, workIncline: 0, ...store.get('custom', {}) },
-  heartCustom: { target: null, minutes: 20, control: 'speed', ...store.get('heartCustom', {}) }, // target null = middle of the fat-burn zone
+  ...personalSettings(),
   traffic: false,
 };
 
@@ -71,6 +113,8 @@ let history = store.get('history', []);
 let profile = store.get('profile', null); // sex, age, weight, height for zones and VO2 max
 let reportPages = []; // canvases of the report on screen
 let reportSummary = null;
+let newPerson = false; // the profile form is filling in a person who does not exist yet
+let deleteArmed = null; // timer while Delete waits for its second tap
 const session = new Session();
 const pending = { Kph: null, Incline: null };
 const sendTimers = { Kph: null, Incline: null };
@@ -83,6 +127,7 @@ const heart = new HeartMonitor();
   if (view) cat.setView(view.yaw, view.pitch);
 }
 
+const severalPeople = () => people.list.length > 1;
 const imperial = () => (settings.units ?? 'metric') === 'imperial';
 const toDisplaySpeed = (kph) => (imperial() ? kph / KM_PER_MILE : kph);
 const fromDisplaySpeed = (v) => (imperial() ? v * KM_PER_MILE : v);
@@ -696,7 +741,7 @@ function showSummary(summary, title) {
   const full = summary.report || !hasProfile ? summary : { ...summary, report: buildReport({ seconds: summary.seconds }, profile) };
   reportSummary = summary;
   reportPages = renderReport(full, { imperial: imperial(), profile: hasProfile ? profile : null });
-  $('summaryTitle').textContent = title;
+  $('summaryTitle').textContent = severalPeople() ? `${title} · ${people.active.name}` : title;
   $('reportPages').replaceChildren(...reportPages);
   reportHint(hasProfile ? '' : 'Add your profile (Settings) to get heart-rate zones, VO2 max and calories for your weight.');
   if ($('programs').open) $('programs').close();
@@ -769,7 +814,12 @@ function readProfileForm() {
 }
 
 function renderProfile() {
-  const p = profile ?? {};
+  const p = newPerson ? {} : (profile ?? {});
+  $('profileTitle').textContent = newPerson ? 'New profile' : 'Your profile';
+  $('pName').value = newPerson ? '' : people.active.name;
+  $('pName').placeholder = newPerson ? people.nextName() : '';
+  $('deletePersonRow').hidden = newPerson || !severalPeople();
+  disarmDelete();
   $('uWeight').textContent = imperial() ? 'Weight lb' : 'Weight kg';
   $('uHeight').textContent = imperial() ? 'Height in' : 'Height cm';
   $('pSex').value = p.sex ?? '';
@@ -785,7 +835,7 @@ function renderProfile() {
 
 function renderProfileFacts() {
   const box = $('profileFacts');
-  if (!isCompleteProfile(profile)) {
+  if (newPerson || !isCompleteProfile(profile)) {
     box.replaceChildren();
     return;
   }
@@ -823,24 +873,126 @@ function saveProfile() {
     $('profileError').hidden = false;
     return;
   }
+  if (newPerson) {
+    const person = people.add($('pName').value);
+    if (!person) {
+      $('profileError').textContent = 'There is no room for another profile. Delete one first.';
+      $('profileError').hidden = false;
+      return;
+    }
+    people.select(person.id);
+    newPerson = false;
+    loadPerson();
+    showTag(person.name);
+  } else people.rename(people.activeId, $('pName').value);
   profile = next;
   store.set('profile', profile);
   store.set('profileAsked', true);
-  $('profileError').hidden = true;
-  renderProfileFacts();
+  renderProfile();
+  renderPerson();
   renderSettings();
   renderValues();
   feedback(880, 20);
 }
 
-function openProfile() {
+/** Opens the profile form for the selected person, or (fresh) for a person about to be added. */
+function openProfile(fresh) {
+  newPerson = fresh === true;
   renderProfile();
-  if ($('settings').open) $('settings').close();
+  for (const id of ['settings', 'people']) if ($(id).open) $(id).close();
   $('profile').showModal();
 }
 
+// ---------- people ----------
+
+function showTag(text) {
+  const tag = $('catTag');
+  tag.textContent = text;
+  tag.classList.remove('show');
+  void tag.offsetWidth; // restart the fade
+  tag.classList.add('show');
+}
+
+function renderPerson() {
+  const name = people.active.name;
+  $('personBtn').textContent = [...name][0].toUpperCase();
+  $('personBtn').setAttribute('aria-label', `Runner: ${name}. Change`);
+}
+
+/** Brings the selected person's profile, history, program settings and cat into the app. */
+function loadPerson() {
+  Object.assign(settings, personalSettings());
+  history = store.get('history', []);
+  profile = store.get('profile', null);
+  renderPerson();
+  applyCatStyle();
+  renderValues();
+  if ($('settings').open) renderSettings();
+  if ($('programs').open) renderProgramSheet();
+}
+
+function switchPerson(id) {
+  if (id === people.activeId || !people.select(id)) return;
+  loadPerson();
+  showTag(people.active.name);
+  feedback(880, 20);
+}
+
+function renderPeople() {
+  $('peopleHint').textContent = session.active
+    ? 'The workout in progress is saved for whoever is selected when it ends.'
+    : 'Each person has their own profile, heart-rate zones, history, program speeds and cat.';
+  $('addPersonBtn').disabled = people.full;
+  $('peopleList').replaceChildren(
+    ...people.list.map((person) => {
+      const selected = person.id === people.activeId;
+      const count = store.peek(person.id, 'history', []).length;
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `card${selected ? ' selected' : ''}`;
+      card.innerHTML = '<b></b><span class="dur"></span><span class="blurb"></span>';
+      card.children[0].textContent = person.name;
+      card.children[1].textContent = selected ? 'Selected' : '';
+      card.children[2].textContent =
+        (count ? `${count} workout${count === 1 ? '' : 's'}` : 'No workouts yet') +
+        (isCompleteProfile(store.peek(person.id, 'profile', null)) ? '' : ' · profile not filled in');
+      card.addEventListener('click', () => {
+        switchPerson(person.id);
+        $('people').close();
+      });
+      return card;
+    }),
+  );
+}
+
+function openPeople() {
+  renderPeople();
+  if ($('settings').open) $('settings').close();
+  if (!$('people').open) $('people').showModal();
+}
+
+function disarmDelete() {
+  clearTimeout(deleteArmed);
+  deleteArmed = null;
+  $('deletePersonBtn').textContent = 'Delete';
+}
+
+/** Deleting takes two taps: the first one only arms the button for a few seconds. */
+function deletePerson() {
+  if (!deleteArmed) {
+    $('deletePersonBtn').textContent = 'Tap again to delete';
+    deleteArmed = setTimeout(disarmDelete, 4000);
+    return;
+  }
+  disarmDelete();
+  if (!people.remove(people.activeId)) return;
+  loadPerson();
+  $('profile').close();
+  openPeople();
+}
+
 function renderHistory() {
-  $('historyHint').textContent = history.length ? `${history.length} workout${history.length === 1 ? '' : 's'} saved on this device.` : 'No workouts yet.';
+  $('historyHint').textContent = history.length ? `${history.length} workout${history.length === 1 ? '' : 's'} saved on this device${severalPeople() ? ` for ${people.active.name}` : ''}.` : 'No workouts yet.';
   $('clearHistoryBtn').hidden = !history.length;
   $('historyRows').replaceChildren(
     ...history.map((summary) => {
@@ -877,11 +1029,7 @@ function nextCat() {
   store.set('cat', settings.cat);
   applyCatStyle();
   feedback(0);
-  const tag = $('catTag');
-  tag.textContent = BREEDS[settings.cat].label;
-  tag.classList.remove('show');
-  void tag.offsetWidth; // restart the fade
-  tag.classList.add('show');
+  showTag(BREEDS[settings.cat].label);
 }
 
 function renderSettings() {
@@ -894,9 +1042,9 @@ function renderSettings() {
   $('trafficChk').checked = settings.traffic;
   $('log').textContent = logLines.join('\n');
 
-  $('profileStatus').textContent = isCompleteProfile(profile)
+  $('profileStatus').textContent = `${people.active.name} · ` + (isCompleteProfile(profile)
     ? `${profile.age} y · ${profile.weightKg} kg · ${profile.heightCm} cm · VO2 max ${currentVo2().value.toFixed(1)}`
-    : 'Not set — needed for zones, VO2 max and calories';
+    : 'not set, needed for zones, VO2 max and calories');
 
   const saved = store.get('code', null);
   $('codeStatus').textContent = client?.activation
@@ -1207,11 +1355,20 @@ $('showAllChk').addEventListener('change', (e) => {
 });
 $('trafficChk').addEventListener('change', (e) => (settings.traffic = e.target.checked));
 
-$('profileBtn').addEventListener('click', openProfile);
+$('profileBtn').addEventListener('click', () => openProfile());
 $('saveProfileBtn').addEventListener('click', saveProfile);
 $('shareReportBtn').addEventListener('click', () => exportReport('share'));
 $('downloadReportBtn').addEventListener('click', () => exportReport('download'));
-$('profile').addEventListener('close', () => store.set('profileAsked', true));
+$('profile').addEventListener('close', () => {
+  store.set('profileAsked', true);
+  newPerson = false;
+  disarmDelete();
+});
+$('personBtn').addEventListener('click', openPeople);
+$('peopleBtn').addEventListener('click', openPeople);
+$('addPersonBtn').addEventListener('click', () => openProfile(true));
+$('editPersonBtn').addEventListener('click', () => openProfile());
+$('deletePersonBtn').addEventListener('click', deletePerson);
 
 heart.addEventListener('change', () => {
   renderHeart();
@@ -1298,16 +1455,9 @@ window.ctlx = {
   heart,
   logLines,
   settings,
+  people,
 };
 
-// Older versions stored the hologram look as a cat choice.
-if (settings.cat === 'holo') {
-  settings.cat = 'tabby';
-  settings.catHolo = true;
-  store.set('cat', settings.cat);
-  store.set('catHolo', true);
-}
-if (settings.cat !== 'off' && !(settings.cat in BREEDS)) settings.cat = 'tabby';
 $('catSel').replaceChildren(
   ...Object.entries(BREEDS).map(([key, breed]) => new Option(breed.label, key)),
   new Option('Hidden', 'off'),
@@ -1315,11 +1465,13 @@ $('catSel').replaceChildren(
 
 setState('disconnected', settings.demo ? 'Demo · offline' : 'Offline');
 renderPresets();
+renderPerson();
 renderValues();
 applyCatStyle();
 
-// First launch: ask for the profile once.
-if (!isCompleteProfile(profile) && !store.get('profileAsked', false)) setTimeout(openProfile, 700);
+// With several people on this device, ask who is running. Otherwise, on first launch, ask for the profile once.
+if (severalPeople()) setTimeout(openPeople, 700);
+else if (!isCompleteProfile(profile) && !store.get('profileAsked', false)) setTimeout(() => openProfile(), 700);
 
 // On iPhone and iPad say straight away why Link cannot work in this browser.
 if (nativeError) banner(`Bluetooth could not be started in this app: ${nativeError.message}`, true);

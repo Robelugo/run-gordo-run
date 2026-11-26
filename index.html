@@ -25,6 +25,7 @@
       <span id="statusText">Offline</span>
     </div>
     <button class="pill" id="connectBtn">Link</button>
+    <button class="icon-btn person" id="personBtn" aria-label="Runner"></button>
     <button class="icon-btn" id="programsBtn" aria-label="Programs and history">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h4V9h4v9h4V5h4v13h2"/></svg>
     </button>
@@ -211,11 +212,12 @@
   <dialog id="profile">
     <div class="sheet">
       <div class="sheet-head">
-        <div class="headline small">Your profile</div>
+        <div class="headline small" id="profileTitle">Your profile</div>
         <button class="pill small" data-close>Close</button>
       </div>
       <p class="hint">Used for heart-rate zones, VO2 max and calories. It stays on this device.</p>
       <div class="form-grid">
+        <label class="wide"><span class="label">Name</span><input type="text" id="pName" maxlength="16" autocomplete="off" autocapitalize="words" spellcheck="false"></label>
         <label><span class="label">Sex</span>
           <select id="pSex"><option value="" disabled>Choose</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select>
         </label>
@@ -241,9 +243,26 @@
       </details>
       <p class="hint error" id="profileError" hidden></p>
       <div class="facts-list" id="profileFacts"></div>
+      <div class="row" id="deletePersonRow" hidden><span>Remove this profile <small>with its workout history</small></span><button type="button" class="pill small abort" id="deletePersonBtn">Delete</button></div>
       <div class="sheet-foot">
         <span class="hint">Estimates, not medical advice.</span>
         <button class="pill confirm" id="saveProfileBtn">Save</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Who is running -->
+  <dialog id="people">
+    <div class="sheet">
+      <div class="sheet-head">
+        <div class="headline small">Who is running?</div>
+        <button class="pill small" data-close>Close</button>
+      </div>
+      <p class="hint" id="peopleHint"></p>
+      <div class="cards" id="peopleList"></div>
+      <div class="sheet-foot">
+        <button type="button" class="pill small" id="editPersonBtn">Edit profile</button>
+        <button type="button" class="pill confirm" id="addPersonBtn">Add person</button>
       </div>
     </div>
   </dialog>
@@ -268,7 +287,7 @@
         <button class="pill small" data-close>Close</button>
       </div>
 
-      <div class="row"><span>Profile <small id="profileStatus">Not set</small></span><button type="button" class="pill small" id="profileBtn">Edit</button></div>
+      <div class="row"><span>Profile <small id="profileStatus">Not set</small></span><span class="row-buttons"><button type="button" class="pill small" id="peopleBtn">Switch</button><button type="button" class="pill small" id="profileBtn">Edit</button></span></div>
       <label class="row"><span>Units</span>
         <select id="unitsSel"><option value="metric">Kilometres</option><option value="imperial">Miles</option></select>
       </label>

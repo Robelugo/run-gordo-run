@@ -33,6 +33,16 @@ Open `http://localhost:8080/?demo` to try the interface with a simulated treadmi
 Add `&warp=6` to run the simulated treadmill's clock six times faster, which is
 handy for watching a long program play out.
 
+## Profiles
+
+Several people can share one device. The round button with an initial at the
+top opens "Who is running?": pick a person, or add one. Each person has their
+own profile (and so their own zones, VO2 max and calories), workout history,
+program speeds and cat; units, the unlock code and sounds are shared. With more
+than one person the app asks who is running each time it opens, and a workout
+is saved for whoever is selected when it ends. A profile is renamed or deleted
+from its own form (Settings > Profile > Edit).
+
 ## Heart-rate programs
 
 With a heart-rate strap linked, the "Heart-rate hold" programs change the speed
@@ -161,6 +171,7 @@ speed: stop it with its own buttons or the safety key.
 - `js/programs.js` - workout programs (presets, custom intervals, step runner)
 - `js/hrcontrol.js` - heart-rate programs: changes speed or incline to hold a target pulse
 - `js/session.js` - workout totals, chart samples and history
+- `js/people.js` - the people sharing the device, and which settings are kept per person
 - `js/heart.js` - direct link to a heart-rate strap (standard Heart Rate service)
 - `js/fitness.js` - heart-rate zones, VO2 max, calories and fat estimates from the profile
 - `js/report.js` - the post-workout report drawn as two shareable 1080x1350 images
