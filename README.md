@@ -43,6 +43,16 @@ than one person the app asks who is running each time it opens, and a workout
 is saved for whoever is selected when it ends. A profile is renamed or deleted
 from its own form (Settings > Profile > Edit).
 
+## Full-screen space view
+
+The corner button on the cat view opens it full screen with the cat running
+through outer space: stars and planets stream past at a pace that follows the
+belt speed (a slow drift when standing still). Speed, incline and time are
+shown along the top; distance, pulse and the exit button along the bottom.
+Dragging still turns the camera. Messages such as a lost connection appear
+over the view. The treadmill's controls are not on this screen: leave it to
+change speed from the app, or use the treadmill's own buttons.
+
 ## Heart-rate programs
 
 With a heart-rate strap linked, the "Heart-rate hold" programs change the speed

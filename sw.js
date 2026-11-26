@@ -1,5 +1,5 @@
 // Offline support: try the network first, fall back to the last copy we saw.
-const CACHE = 'run-gordo-run-v13';
+const CACHE = 'run-gordo-run-v14';
 const SHELL = [
   './',
   'index.html',

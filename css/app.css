@@ -162,7 +162,7 @@ button { cursor: pointer; }
 }
 .stage[data-run="0"] .scan { animation-duration: 11s; opacity: 0.5; }
 
-.stage-hud { position: absolute; top: 8px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; }
+.stage-hud { position: absolute; top: 8px; left: 10px; right: 50px; display: flex; justify-content: space-between; pointer-events: none; }
 .tag {
   font: 600 10px var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent);
   padding: 3px 7px; border: 1px solid var(--line); background: rgba(5, 12, 14, 0.55); border-radius: 2px;
@@ -194,6 +194,50 @@ button { cursor: pointer; }
 .segments i { position: relative; flex: var(--w, 1) 1 0; min-width: 2px; background: rgba(var(--accent-rgb), 0.18); overflow: hidden; }
 .segments i.done { background: rgba(var(--accent-rgb), 0.75); }
 .segments i.now::after { content: ""; position: absolute; inset: 0; width: var(--p, 0%); background: var(--accent); box-shadow: 0 0 8px var(--accent); transition: width 1s linear; }
+
+/* ---------- full-screen space view ---------- */
+
+.space-btn { position: absolute; top: 6px; right: 8px; width: 34px; height: 28px; background: rgba(5, 12, 14, 0.55); }
+.stage.no-cat .space-btn { display: none; }
+.stage.no-cat .stage-hud { right: 10px; }
+
+.stage.space {
+  position: fixed; inset: 0; z-index: 30; height: auto; min-height: 0; border: 0; border-radius: 0; box-shadow: none;
+  background:
+    radial-gradient(90% 60% at 20% 16%, rgba(92, 54, 156, 0.4), transparent 60%),
+    radial-gradient(80% 60% at 84% 80%, rgba(24, 96, 146, 0.36), transparent 60%),
+    radial-gradient(50% 40% at 72% 22%, rgba(156, 62, 112, 0.16), transparent 70%),
+    #02030a;
+}
+.stage.space::before, .stage.space::after, .stage.space .scan, .stage.space .stage-hud, .stage.space .space-btn { display: none; }
+.stage.space .program-bar {
+  left: 0; right: 0; margin: 0 auto; width: min(560px, calc(100% - 24px));
+  bottom: calc(92px + env(safe-area-inset-bottom));
+  border: 1px solid var(--line); border-radius: 3px; background: rgba(5, 12, 14, 0.62);
+}
+.stage.space .cat-tag { bottom: auto; top: calc(128px + env(safe-area-inset-top)); }
+
+.space-hud {
+  position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none;
+  padding: calc(14px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
+}
+.space-hud[hidden] { display: none; }
+.space-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 12px; }
+.space-row.top { align-items: start; }
+.space-read { display: flex; flex-direction: column; gap: 3px; min-width: 0; text-shadow: 0 0 3px #000, 0 0 14px #000; }
+.space-read.mid { align-items: center; }
+.space-read.right { align-items: flex-end; }
+.space-read .label { color: var(--accent); }
+.space-read b { font-size: clamp(44px, 11vmin, 92px); font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; color: #f1fffd; white-space: nowrap; }
+.space-read.minor b { font-size: clamp(24px, 5.5vmin, 44px); }
+.space-read small { margin-left: 5px; font: 600 11px var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.space-hud .pill { pointer-events: auto; background: rgba(5, 12, 14, 0.66); }
+.space-note {
+  align-self: center; margin: 0; max-width: min(520px, 100%); padding: 8px 12px; text-align: center;
+  border: 1px solid rgba(var(--warn-rgb), 0.5); border-radius: 3px; background: rgba(5, 12, 14, 0.78); color: var(--warn); font-size: 12px;
+}
+.space-note.error { border-color: rgba(var(--stop-rgb), 0.6); color: #ff8a8a; }
+.space-note[hidden] { display: none; }
 
 /* ---------- gauges ---------- */
 

@@ -189,6 +189,11 @@ function banner(text, isError = false) {
   el.textContent = text ?? '';
   el.classList.toggle('error', isError);
   el.dataset.kind = text ? 'msg' : '';
+  // The same message over the full-screen space view, which covers the banner.
+  const note = $('spaceNote');
+  note.hidden = !text;
+  note.textContent = text ?? '';
+  note.classList.toggle('error', isError);
 }
 
 function paceText(kph) {
@@ -242,6 +247,15 @@ function renderValues() {
   $('paceTag').textContent = isMoving(mode) && kph >= 0.5 ? `${paceText(kph)} /${distUnit()}` : '';
   cat.setSpeed(kph);
   cat.setIncline(v.CurrentIncline ?? 0);
+  if (!$('spaceHud').hidden) {
+    tweenNumber($('spSpeed'), toDisplaySpeed(kph), 1);
+    tweenNumber($('spIncline'), v.CurrentIncline ?? 0, 1);
+    $('spSpeedUnit').textContent = speedUnit();
+    $('spTime').textContent = formatClock(session.seconds);
+    $('spDist').textContent = $('mDistance').textContent;
+    $('spDistUnit').textContent = distUnit();
+    $('spPulse').textContent = currentBpm(v) || '--';
+  }
 
   if (client?.connected && mode !== undefined) {
     const prefix = uiState === 'monitor' ? 'Monitor' : client.transport.name;
@@ -1079,7 +1093,41 @@ function renderSettings() {
   );
 }
 
+// ---------- full-screen space view ----------
+
+const SPACE_VIEW = { yaw: -1.1, pitch: 0.2 }; // from behind the cat, so the stars come towards us
+let viewBeforeSpace = null; // camera angles to go back to; also tells that the space view is on
+
+function setSpace(on) {
+  if (on === !!viewBeforeSpace || (on && (!cat.ok || settings.cat === 'off'))) return;
+  cat.fling(0);
+  if (on) {
+    viewBeforeSpace = { yaw: cat.yaw, pitch: cat.pitch };
+    cat.setView(SPACE_VIEW.yaw, SPACE_VIEW.pitch);
+    // Hide the browser's own bars where that is possible; the view covers the page either way.
+    try {
+      document.documentElement.requestFullscreen?.({ navigationUI: 'hide' })?.catch(() => {});
+    } catch {
+      /* no full screen here */
+    }
+  } else {
+    cat.setView(viewBeforeSpace.yaw, viewBeforeSpace.pitch);
+    viewBeforeSpace = null;
+    try {
+      if (document.fullscreenElement) document.exitFullscreen?.()?.catch(() => {});
+    } catch {
+      /* already out */
+    }
+  }
+  $('stage').classList.toggle('space', on);
+  $('spaceHud').hidden = !on;
+  cat.setSpace(on);
+  feedback(0);
+  renderValues();
+}
+
 function applyCatStyle() {
+  if (settings.cat === 'off' || !cat.ok) setSpace(false);
   $('stage').classList.toggle('no-cat', settings.cat === 'off' || !cat.ok);
   if (!cat.ok) return;
   if (settings.cat !== 'off') cat.setBreed(settings.cat);
@@ -1294,7 +1342,7 @@ $('holoChk').addEventListener('change', (e) => {
   const stage = $('stage');
   let drag = null;
   stage.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('.program-bar') || !cat.ok || settings.cat === 'off') return;
+    if (e.target.closest('.program-bar, button') || !cat.ok || settings.cat === 'off') return;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, speed: 0, at: performance.now() };
     cat.fling(0);
   });
@@ -1329,11 +1377,20 @@ $('holoChk').addEventListener('change', (e) => {
       return;
     }
     if (performance.now() - at < 80) cat.fling(speed * 0.6); // keep gliding after a flick
-    store.set('view', { yaw: cat.yaw, pitch: cat.pitch });
+    if (!viewBeforeSpace) store.set('view', { yaw: cat.yaw, pitch: cat.pitch }); // the space view is not kept
   };
   stage.addEventListener('pointerup', end);
   stage.addEventListener('pointercancel', end);
 }
+$('spaceBtn').addEventListener('click', () => setSpace(true));
+$('spaceExitBtn').addEventListener('click', () => setSpace(false));
+// Leaving the browser's full screen (Esc, the back gesture) also leaves the space view.
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) setSpace(false);
+});
+addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !document.querySelector('dialog[open]')) setSpace(false);
+});
 $('resetViewBtn').addEventListener('click', () => {
   cat.fling(0);
   cat.setView(DEFAULT_VIEW.yaw, DEFAULT_VIEW.pitch);

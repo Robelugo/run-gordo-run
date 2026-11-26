@@ -4,6 +4,9 @@
 //
 //   const cat = new CatScene(canvas);
 //   cat.setSpeed(kph); cat.setIncline(percent); cat.start();
+//
+// cat.setSpace(true) adds outer space around the treadmill: stars and planets
+// that stream past at a pace that follows the running speed.
 
 // ---------- tiny matrix library (column-major 4x4) ----------
 
@@ -150,6 +153,67 @@ void main() {
   gl_FragColor = vec4(col * uAlpha, uAlpha);
 }`;
 
+// ---------- outer space ----------
+
+const STAR_COUNT = 3200;
+const STAR_SPAN = 240; // the star field repeats over this length along the running direction
+const STAR_BACK = 60; // how far behind the cat stars live on before wrapping to the front
+
+// Stars are points; the vertex shader slides them towards the cat and wraps them round.
+const STAR_VERT = `
+attribute vec4 aStar;
+uniform mat4 uViewProj; uniform float uTravel; uniform float uScale; uniform float uMaxSize;
+varying float vGlow; varying float vTint;
+void main() {
+  vec3 p = aStar.xyz;
+  p.x = mod(p.x - uTravel, ${STAR_SPAN}.0) - ${STAR_BACK}.0;
+  gl_Position = uViewProj * vec4(p, 1.0);
+  float size = uScale * (0.07 + 0.2 * aStar.w * aStar.w) / max(gl_Position.w, 0.5);
+  gl_PointSize = clamp(size, 1.0, uMaxSize);
+  // Fade in far ahead and out behind, so wrapping round is never seen.
+  float ends = (1.0 - smoothstep(${STAR_SPAN - STAR_BACK - 50}.0, ${STAR_SPAN - STAR_BACK}.0, p.x)) * smoothstep(-${STAR_BACK}.0, -${STAR_BACK - 15}.0, p.x);
+  vGlow = (0.45 + 0.55 * aStar.w) * ends * clamp(size, 0.5, 1.0);
+  vTint = fract(aStar.w * 7.31);
+}`;
+
+const STAR_FRAG = `
+precision mediump float;
+varying float vGlow; varying float vTint;
+void main() {
+  float a = (1.0 - smoothstep(0.05, 0.5, length(gl_PointCoord - 0.5))) * vGlow;
+  vec3 col = mix(vec3(0.72, 0.85, 1.0), vec3(1.0, 0.9, 0.74), vTint);
+  gl_FragColor = vec4(col * a, a);
+}`;
+
+/** Small repeatable random number generator, so the sky is the same every time. */
+function seeded(seed) {
+  let s = seed >>> 0;
+  return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+}
+
+/** Star positions (x along the running direction, then a wide tube around it) and a brightness. */
+function starField() {
+  const rand = seeded(7);
+  const v = new Float32Array(STAR_COUNT * 4);
+  for (let i = 0; i < STAR_COUNT; i++) {
+    const angle = rand() * Math.PI * 2;
+    const r = 3 + 110 * Math.pow(rand(), 0.8); // none through the cat itself
+    v.set([rand() * STAR_SPAN, Math.cos(angle) * r, Math.sin(angle) * r, rand()], i * 4);
+  }
+  return v;
+}
+
+/** The planets that take turns drifting past. Radius in scene units (the cat is about 1 long). */
+const PLANETS = [
+  { r: 7, color: '#c98f52', band: '#8d5c30', ring: '#e8d3a2' },
+  { r: 4.4, color: '#3d7fd2', band: '#a9d6ff' },
+  { r: 2.8, color: '#b54a30' },
+  { r: 5.4, color: '#8d7bd8', band: '#5b4aa3', moon: '#d2d2da' },
+  { r: 2.1, color: '#d9d3c2' },
+];
+const PLANET_GAP = 75; // spacing between planets along the way
+const PLANET_GONE = -80; // behind the cat by this much, a planet starts again far ahead
+
 const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
 const smooth = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -231,6 +295,10 @@ export class CatScene {
     this.yaw = DEFAULT_VIEW.yaw; // camera angle around the cat, radians
     this.pitch = DEFAULT_VIEW.pitch; // camera height angle, radians
     this.spin = 0; // leftover turning speed after a flick
+    this.space = false; // outer space around the treadmill
+    this.travel = 0; // how far the stars have slid past
+    this._rand = seeded(11);
+    this.planets = PLANETS.map((look, i) => this._placePlanet({ look, color: hex(look.color) }, 70 + i * PLANET_GAP, false));
     this.ok = false;
     this._frame = null;
     this._last = 0;
@@ -245,11 +313,26 @@ export class CatScene {
       if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
       return s;
     };
-    const prog = gl.createProgram();
-    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
-    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    const link = (vert, frag) => {
+      const p = gl.createProgram();
+      gl.attachShader(p, compile(gl.VERTEX_SHADER, vert));
+      gl.attachShader(p, compile(gl.FRAGMENT_SHADER, frag));
+      gl.linkProgram(p);
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+      return p;
+    };
+    // Stars have their own small program; without it the scene just has no stars.
+    try {
+      const stars = link(STAR_VERT, STAR_FRAG);
+      this.stars = { prog: stars, attr: gl.getAttribLocation(stars, 'aStar'), buffer: gl.createBuffer() };
+      for (const name of ['uViewProj', 'uTravel', 'uScale', 'uMaxSize']) this.stars[name] = gl.getUniformLocation(stars, name);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.stars.buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, starField(), gl.STATIC_DRAW);
+    } catch {
+      this.stars = null;
+    }
+    const prog = link(VERT, FRAG);
+    this.prog = prog;
     gl.useProgram(prog);
     this.loc = {
       pos: gl.getAttribLocation(prog, 'aPos'),
@@ -319,6 +402,26 @@ export class CatScene {
     this.targetIncline = percent || 0;
   }
 
+  /** Outer space on or off: stars and planets streaming past, faster the faster the belt runs. */
+  setSpace(on) {
+    this.space = !!on;
+    if (this.ok && !this.running) this._draw();
+  }
+
+  /** Put a planet at `x` ahead, somewhere off to the side so it never runs into the cat or the camera. */
+  _placePlanet(planet, x, grows = true) {
+    const rand = this._rand;
+    const angle = rand() * TAU;
+    const off = planet.look.r * 1.3 + 9 + rand() * 15;
+    planet.x = x;
+    planet.born = grows ? x : Infinity; // new ones grow from nothing while still far away
+    planet.y = Math.sin(angle) * off * 0.75;
+    planet.z = Math.cos(angle) * off;
+    planet.tilt = (rand() - 0.5) * 1.1;
+    planet.lean = (rand() - 0.5) * 0.7;
+    return planet;
+  }
+
   start() {
     if (!this.ok || this.running) return;
     this.running = true;
@@ -367,6 +470,19 @@ export class CatScene {
     this.phase = (this.phase + dt * cadence * TAU) % (TAU * 64);
     this.belt = (this.belt + dt * (this.kph / 3.6) * 0.75) % 1000;
     this.time += dt;
+    if (this.space) {
+      // A slow drift when standing still, then in step with the belt speed.
+      const flow = dt * (0.6 + this.kph * 2.6);
+      this.travel = (this.travel + flow) % STAR_SPAN;
+      let ahead = Math.max(...this.planets.map((p) => p.x));
+      for (const p of this.planets) {
+        p.x -= flow;
+        if (p.x < PLANET_GONE) {
+          ahead = Math.max(ahead + PLANET_GAP, 300);
+          this._placePlanet(p, ahead);
+        }
+      }
+    }
     if (this.spin) {
       this.yaw += this.spin * dt;
       this.spin *= Math.exp(-dt * 4);
@@ -402,16 +518,17 @@ export class CatScene {
 
     // Camera: three-quarter view, pulled back on narrow canvases so the cat always fits.
     const aspect = width / height;
-    const fov = 0.5;
+    const fov = this.space ? 0.72 : 0.5; // wider in space, so the stars rush past the edges
     const need = 1.5 / Math.tan(fov / 2) / Math.min(aspect, 1.9);
-    const dist = Math.max(3.9, need);
+    const dist = Math.max(this.space ? 2.9 : 3.9, need);
     const sway = Math.sin(this.time * 0.25) * 0.08;
     const yaw = this.yaw + sway, cp = Math.cos(this.pitch);
     const dir = [Math.sin(yaw) * cp, Math.sin(this.pitch), Math.cos(yaw) * cp];
     const eye = [0.1 + dir[0] * dist * 1.04, 0.6 + dir[1] * dist * 1.04, dir[2] * dist * 1.04];
-    const viewProj = mul(perspective(fov, aspect, 0.1, 50), lookAt(eye, [0.1, 0.6, 0], [0, 1, 0]));
+    const viewProj = mul(perspective(fov, aspect, this.space ? 0.25 : 0.1, this.space ? 600 : 50), lookAt(eye, [0.1, 0.6, 0], [0, 1, 0]));
     gl.uniformMatrix4fv(this.loc.uViewProj, false, viewProj);
     gl.uniform3fv(this.loc.uEye, eye);
+    if (this.space) this._drawPlanets();
     gl.uniform3fv(this.loc.uRim, P.rim);
     gl.uniform1f(this.loc.uHolo, this.holo ? 1 : 0);
     gl.uniform1f(this.loc.uTime, this.time % 1000);
@@ -534,5 +651,64 @@ export class CatScene {
         this._part('box', sc(tr(whisker, 0.11, 0, 0), 0.11, 0.003, 0.003), [1, 1, 1], { shade: 0.2 });
       }
     }
+    if (this.space) this._drawStars(viewProj, height, fov);
+  }
+
+  _drawPlanets() {
+    const gl = this.gl;
+    gl.uniform1f(this.loc.uHolo, 0);
+    gl.uniform3fv(this.loc.uRim, [0.55, 0.78, 1]); // a thin blue edge of atmosphere
+    for (const p of this.planets) {
+      const look = p.look;
+      const R = look.r * smooth(0, 45, p.born - p.x);
+      if (R < 0.01) continue;
+      const m = rx(rz(tr(ident(), p.x, p.y, p.z), p.tilt), p.lean);
+      this._ell(m, 0, 0, 0, R, R, R, p.color);
+      if (look.band) {
+        const band = (p.bandColor ??= hex(look.band));
+        for (const [h, thick] of [[-0.5, 0.07], [-0.12, 0.1], [0.3, 0.06], [0.62, 0.05]]) {
+          const wide = Math.sqrt(1 - h * h) * 1.012 * R; // just proud of the surface at that height
+          this._ell(m, 0, h * R, 0, wide, thick * R, wide, band);
+        }
+      }
+      if (look.moon) {
+        const a = this.time * 0.25;
+        this._ell(m, Math.cos(a) * R * 2.1, R * 0.15, Math.sin(a) * R * 2.1, R * 0.17, R * 0.17, R * 0.17, (p.moonColor ??= hex(look.moon)));
+      }
+      if (look.ring) {
+        const ring = (p.ringColor ??= hex(look.ring));
+        gl.enable(gl.BLEND);
+        gl.depthMask(false);
+        this._ell(m, 0, 0, 0, R * 2.15, R * 0.004, R * 2.15, ring, { alpha: 0.22, shade: 0.3 });
+        this._ell(m, 0, 0, 0, R * 1.75, R * 0.006, R * 1.75, ring, { alpha: 0.4, shade: 0.3 });
+        gl.depthMask(true);
+        gl.disable(gl.BLEND);
+      }
+    }
+  }
+
+  _drawStars(viewProj, height, fov) {
+    const gl = this.gl;
+    const s = this.stars;
+    if (!s) return;
+    gl.useProgram(s.prog);
+    gl.disableVertexAttribArray(this.loc.pos);
+    gl.disableVertexAttribArray(this.loc.normal);
+    gl.enableVertexAttribArray(s.attr);
+    gl.bindBuffer(gl.ARRAY_BUFFER, s.buffer);
+    gl.vertexAttribPointer(s.attr, 4, gl.FLOAT, false, 16, 0);
+    gl.uniformMatrix4fv(s.uViewProj, false, viewProj);
+    gl.uniform1f(s.uTravel, this.travel);
+    gl.uniform1f(s.uScale, height / 2 / Math.tan(fov / 2)); // pixels per scene unit at distance 1
+    gl.uniform1f(s.uMaxSize, Math.max(3, height / 220));
+    gl.enable(gl.BLEND);
+    gl.depthMask(false);
+    gl.drawArrays(gl.POINTS, 0, STAR_COUNT);
+    gl.depthMask(true);
+    gl.disable(gl.BLEND);
+    gl.disableVertexAttribArray(s.attr);
+    gl.enableVertexAttribArray(this.loc.pos);
+    gl.enableVertexAttribArray(this.loc.normal);
+    gl.useProgram(this.prog);
   }
 }

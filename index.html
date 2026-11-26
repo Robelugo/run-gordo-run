@@ -57,6 +57,23 @@
         </div>
         <div class="segments" id="progSegments"></div>
       </div>
+      <button class="icon-btn space-btn" id="spaceBtn" aria-label="Full screen: run through space">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+      <!-- Readouts over the full-screen space view -->
+      <div class="space-hud" id="spaceHud" hidden>
+        <div class="space-row top">
+          <div class="space-read"><span class="label">Speed</span><b><span id="spSpeed">0.0</span><small id="spSpeedUnit">km/h</small></b></div>
+          <div class="space-read mid minor"><span class="label">Time</span><b id="spTime">0:00</b></div>
+          <div class="space-read right"><span class="label">Incline</span><b><span id="spIncline">0.0</span><small>%</small></b></div>
+        </div>
+        <p class="space-note" id="spaceNote" hidden></p>
+        <div class="space-row">
+          <div class="space-read minor"><span class="label">Distance</span><b><span id="spDist">0.00</span><small id="spDistUnit">km</small></b></div>
+          <button type="button" class="pill" id="spaceExitBtn">Exit full screen</button>
+          <div class="space-read right minor"><span class="label">Pulse</span><b><span id="spPulse">--</span><small>bpm</small></b></div>
+        </div>
+      </div>
     </section>
 
     <section class="panel gauge" id="speedPanel" style="--i:1">
